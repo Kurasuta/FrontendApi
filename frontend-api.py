@@ -6,6 +6,9 @@ import os
 import logging
 import psycopg2
 
+if 'PUBLIC_SOURCES' not in os.environ:
+    raise Exception('Environment variable PUBLIC_SOURCES does not exist. Cannot start API.')
+
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('KurasutaFrontendApi')
 debugging_enabled = 'FLASK_DEBUG' in os.environ
@@ -17,7 +20,8 @@ app.config.from_object(__name__)  # load config from this file , flaskr.py
 # Load default config and override config from an environment variable
 app.config.update(dict(
     DATABASE=os.environ['POSTGRES_DATABASE_LINK'],
-    SECRET_KEY=os.environ['FLASK_SECRET_KEY']
+    SECRET_KEY=os.environ['FLASK_SECRET_KEY'],
+    PUBLIC_SOURCES=[identifier.strip() for identifier in os.environ['PUBLIC_SOURCES'].split(',') if identifier.strip()]
 ))
 app.config.from_envvar('FLASKR_SETTINGS', silent=True)
 
@@ -42,7 +46,7 @@ def close_db(error):
 @app.route('/sha256/<sha256>', methods=['GET'])
 def get_sha256(sha256):
     validate_sha256(sha256)
-    sample = SampleRepository(get_db()).by_hash_sha256(sha256)
+    sample = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_hash_sha256(sha256)
     return jsonify(JsonFactory().from_sample(sample))
 
 
