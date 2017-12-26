@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, g
+from werkzeug.exceptions import NotFound
 from lib.repository import SampleRepository
 from lib.sample import JsonFactory
 from lib.flask import validate_sha256
@@ -43,10 +44,12 @@ def close_db(error):
         g.db.close()
 
 
-@app.route('/sha256/<sha256>', methods=['GET'])
+@app.route('/<sha256>', methods=['GET'])
 def get_sha256(sha256):
     validate_sha256(sha256)
     sample = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_hash_sha256(sha256)
+    if not sample:
+        raise NotFound()
     return jsonify(JsonFactory().from_sample(sample))
 
 
