@@ -44,13 +44,20 @@ def close_db(error):
         g.db.close()
 
 
-@app.route('/<sha256>', methods=['GET'])
-def get_sha256(sha256):
+@app.route('/sample/<sha256>', methods=['GET'])
+def get_sample(sha256):
     validate_sha256(sha256)
     sample = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_hash_sha256(sha256)
     if not sample:
         raise NotFound()
     return jsonify(JsonFactory().from_sample(sample))
+
+
+@app.route('/section/<sha256>', method=['GET'])
+def get_samples_by_section(sha256):
+    validate_sha256(sha256)
+    samples = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_section_hash(sha256)
+    return jsonify([JsonFactory().from_sample(sample) for sample in samples])
 
 
 if __name__ == '__main__':
