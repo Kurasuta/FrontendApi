@@ -12,7 +12,7 @@ if 'PUBLIC_SOURCES' not in os.environ:
 
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('KurasutaFrontendApi')
-debugging_enabled = 'FLASK_DEBUG' in os.environ
+debugging_enabled = 'FLASK_DEBUG' in os.environ and os.environ['FLASK_DEBUG']
 logger.setLevel(logging.DEBUG if debugging_enabled else logging.WARNING)
 
 app = Flask(__name__)
@@ -38,6 +38,12 @@ def get_db():
     return g.db
 
 
+def get_sample_repository():
+    if not hasattr(g, 'sample_repository'):
+        g.sample_repository = SampleRepository(get_db(), app.config['PUBLIC_SOURCES'])
+    return g.sample_repository
+
+
 @app.teardown_appcontext
 def close_db(error):
     if hasattr(g, 'db'):
@@ -47,16 +53,21 @@ def close_db(error):
 @app.route('/sample/<sha256>', methods=['GET'])
 def get_sample(sha256):
     validate_sha256(sha256)
-    sample = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_hash_sha256(sha256)
+    sample = get_sample_repository().by_hash_sha256(sha256)
     if not sample:
         raise NotFound()
     return jsonify(JsonFactory().from_sample(sample))
 
 
+@app.route('/newest_samples', methods=['GET'])
+def newest_samples():
+    return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().newest(10))])
+
+
 @app.route('/section/<sha256>', methods=['GET'])
 def get_samples_by_section(sha256):
     validate_sha256(sha256)
-    samples = SampleRepository(get_db(), app.config['PUBLIC_SOURCES']).by_section_hash(sha256)
+    samples = get_sample_repository().by_section_hash(sha256)
     return jsonify([JsonFactory().from_sample(sample) for sample in samples])
 
 
