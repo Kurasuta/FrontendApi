@@ -50,6 +50,13 @@ def close_db(error):
         g.db.close()
 
 
+@app.errorhandler(InvalidUsage)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+
 @app.route('/sample/<sha256>', methods=['GET'])
 def get_sample(sha256):
     validate_sha256(sha256)
