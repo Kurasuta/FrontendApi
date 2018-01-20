@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, g
+from lib.flask import InvalidUsage
 from werkzeug.exceptions import NotFound
 from lib.repository import SampleRepository
 from lib.sample import JsonFactory
