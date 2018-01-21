@@ -77,9 +77,9 @@ def newest_samples():
 def build_time_stamps_by_year():
     with get_db().cursor() as cursor:
         cursor.execute('''
-            SELECT extract(YEAR FROM build_timestamp), COUNT(*)
+            SELECT EXTRACT(YEAR FROM build_timestamp), COUNT(*)
             FROM sample
-            GROUP BY 1;
+            GROUP BY 1
         ''')
         ret = {}
         for row in cursor.fetchall():
@@ -98,16 +98,22 @@ def random_sample_by_year(year):
     if year > 3000:
         raise InvalidUsage('Given year should be below 3000')
     with get_db().cursor() as cursor:
-        cursor.execute('SELECT COUNT(*) FROM sample WHERE EXTRACT(YEAR FROM build_timestamp) = %s' % (year,))
+        cursor.execute('''
+            SELECT COUNT(*)
+            FROM sample
+            WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
+              AND (build_timestamp < \'%i-01-01 00:00:00\')
+        ''' % (year, year + 1))
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
             '''
             SELECT hash_sha256
             FROM sample
-            WHERE EXTRACT(YEAR FROM build_timestamp) = %s
+            WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
+              AND (build_timestamp < \'%i-01-01 00:00:00\')
             LIMIT 1 OFFSET %s
-            ''' % (year, rand)
+            ''' % (year, year + 1, rand)
         )
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(cursor.fetchall()[0][0])))
 
