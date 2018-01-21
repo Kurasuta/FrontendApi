@@ -83,7 +83,7 @@ def build_time_stamps_by_year():
         ret = {}
         for row in cursor.fetchall():
             ret[row[0]] = int(row[1])
-    return ret
+    return jsonify(ret)
 
 
 @app.route('/section/<sha256>', methods=['GET'])
