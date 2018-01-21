@@ -109,7 +109,7 @@ def random_sample_by_year(year):
             LIMIT 1 OFFSET %s
             ''' % (year, rand)
         )
-        return jsonify(JsonFactory().from_sample(SampleRepository.by_hash_sha256(cursor.fetchall()[0][0])))
+        return jsonify(JsonFactory().from_sample(SampleRepository().by_hash_sha256(cursor.fetchall()[0][0])))
 
 
 @app.route('/section/<sha256>', methods=['GET'])
