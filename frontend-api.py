@@ -5,6 +5,7 @@ from lib.repository import SampleRepository
 from lib.sample import JsonFactory
 from lib.flask import validate_sha256
 import os
+import random
 import logging
 import psycopg2
 
@@ -76,14 +77,34 @@ def newest_samples():
 def build_time_stamps_by_year():
     with get_db().cursor() as cursor:
         cursor.execute('''
-            SELECT extract(year from build_timestamp), COUNT(*)
+            SELECT extract(YEAR FROM build_timestamp), COUNT(*)
             FROM sample
             GROUP BY 1;
         ''')
         ret = {}
         for row in cursor.fetchall():
-            ret[row[0]] = int(row[1])
+            ret[int(row[0])] = int(row[1])
     return jsonify(ret)
+
+
+@app.route('/random_sample/by_year/<year>', methods=['GET'])
+def random_sample_by_year(year):
+    try:
+        year = int(year)
+    except ValueError:
+        raise InvalidUsage('Given year is not an integer')
+    if year < 1970:
+        raise InvalidUsage('Given year should be above 1970')
+    if year > 3000:
+        raise InvalidUsage('Given year should be below 3000')
+    with get_db().cursor() as cursor:
+        cursor.execute('SELECT COUNT(*) FROM sample WHERE EXTRACT(YEAR FROM build_timestamp) = %s' % (year,))
+        count = cursor.fetchall()[0][0]
+        rand = random.randint(0, count - 1)
+        cursor.execute(
+            'SELECT hash_sha256 FROM sample WHERE EXTRACT(YEAR FROM build_timestamp) = %s LIMIT 1,%s' % (year, rand)
+        )
+        return jsonify(JsonFactory().from_sample(SampleRepository.by_hash_sha256(cursor.fetchall[0][0])))
 
 
 @app.route('/section/<sha256>', methods=['GET'])
