@@ -72,6 +72,20 @@ def newest_samples():
     return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().newest(10))])
 
 
+@app.route('/stats/build_time_stamps_by_year', methods=['GET'])
+def build_time_stamps_by_year():
+    with get_db().cursor() as cursor:
+        cursor.execute('''
+            SELECT extract(year from build_timestamp), COUNT(*)
+            FROM sample
+            GROUP BY 1;
+        ''')
+        ret = {}
+        for row in cursor.fetchall():
+            ret[row[0]] = int(row[1])
+    return ret
+
+
 @app.route('/section/<sha256>', methods=['GET'])
 def get_samples_by_section(sha256):
     validate_sha256(sha256)
