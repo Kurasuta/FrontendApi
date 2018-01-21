@@ -102,7 +102,12 @@ def random_sample_by_year(year):
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
-            'SELECT hash_sha256 FROM sample WHERE EXTRACT(YEAR FROM build_timestamp) = %s LIMIT 1,%s' % (year, rand)
+            '''
+            SELECT hash_sha256
+            FROM sample
+            WHERE EXTRACT(YEAR FROM build_timestamp) = %s
+            LIMIT 1 OFFSET %s
+            ''' % (year, rand)
         )
         return jsonify(JsonFactory().from_sample(SampleRepository.by_hash_sha256(cursor.fetchall[0][0])))
 
