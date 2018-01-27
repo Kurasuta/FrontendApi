@@ -79,8 +79,10 @@ def build_time_stamps_by_year():
         cursor.execute('''
             SELECT EXTRACT(YEAR FROM build_timestamp), COUNT(*)
             FROM sample
+            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
+            WHERE (sample_has_source.source_id IN %s)
             GROUP BY 1
-        ''')
+        ''', (get_sample_repository().allowed_source_ids, ))
         ret = {}
         for row in cursor.fetchall():
             ret[int(row[0])] = int(row[1])
@@ -101,9 +103,11 @@ def random_sample_by_year(year):
         cursor.execute('''
             SELECT COUNT(*)
             FROM sample
+            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
-        ''' % (year, year + 1))
+              AND (sample_has_source.source_id IN %s)
+        ''' % (year, year + 1, get_sample_repository().allowed_source_ids))
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
@@ -112,10 +116,12 @@ def random_sample_by_year(year):
             FROM sample
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
+              AND (sample_has_source.source_id IN %s)
             LIMIT 1 OFFSET %s
-            ''' % (year, year + 1, rand)
+            ''' % (year, year + 1, get_sample_repository().allowed_source_ids, rand)
         )
-        return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(cursor.fetchall()[0][0])))
+        random_sha256 = cursor.fetchall()[0][0]
+        return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
 
 
 @app.route('/section/<sha256>', methods=['GET'])
