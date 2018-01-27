@@ -114,6 +114,7 @@ def random_sample_by_year(year):
             '''
             SELECT hash_sha256
             FROM sample
+            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
               AND (sample_has_source.source_id IN %s)
