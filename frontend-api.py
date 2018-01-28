@@ -82,7 +82,7 @@ def build_time_stamps_by_year():
             LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
             WHERE (sample_has_source.source_id IN %s)
             GROUP BY 1
-        ''', (get_sample_repository().allowed_source_ids, ))
+        ''', (get_sample_repository().allowed_source_ids,))
         ret = {}
         for row in cursor.fetchall():
             ret[int(row[0])] = int(row[1])
@@ -125,6 +125,19 @@ def random_sample_by_year(year):
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
 
 
+@app.route('/random_sample/<count>', method=['GET'])
+def random_samples(count):
+    try:
+        count = int(count)
+    except ValueError:
+        raise InvalidUsage('Given count is not an integer')
+    if count <= 0:
+        raise InvalidUsage('Given count should be above 0')
+    if count > 50:
+        raise InvalidUsage('Given count should be below 50')
+    return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().random(count))])
+
+
 @app.route('/section/<sha256>', methods=['GET'])
 def get_samples_by_section(sha256):
     validate_sha256(sha256)
@@ -140,6 +153,7 @@ if __name__ == '__main__':
     else:
         logger.warning('Environment variable RAVEN_CLIENT_STRING does not exist. No logging to Sentry is performed.')
     app.run(
+        threaded=True,
         port=int(os.environ['FLASK_PORT']) if 'FLASK_PORT' in os.environ else None,
         debug=debugging_enabled
     )
