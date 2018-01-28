@@ -125,7 +125,7 @@ def random_sample_by_year(year):
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
 
 
-@app.route('/random_sample/<count>', method=['GET'])
+@app.route('/random_sample/<count>', methods=['GET'])
 def random_samples(count):
     try:
         count = int(count)
