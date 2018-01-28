@@ -153,7 +153,7 @@ if __name__ == '__main__':
     else:
         logger.warning('Environment variable RAVEN_CLIENT_STRING does not exist. No logging to Sentry is performed.')
     app.run(
-        threaded=True,
+        processes=4,
         port=int(os.environ['FLASK_PORT']) if 'FLASK_PORT' in os.environ else None,
         debug=debugging_enabled
     )
