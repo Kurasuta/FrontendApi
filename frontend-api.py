@@ -74,7 +74,7 @@ def newest_samples():
 
 
 @app.route('/stats/count', methods=['GET'])
-def build_time_stamps_by_year():
+def stats_count():
     with get_db().cursor() as cursor:
         cursor.execute('''
             SELECT COUNT(id)
