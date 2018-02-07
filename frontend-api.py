@@ -73,6 +73,20 @@ def newest_samples():
     return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().newest(10))])
 
 
+@app.route('/stats/count', methods=['GET'])
+def build_time_stamps_by_year():
+    with get_db().cursor() as cursor:
+        cursor.execute('''
+            SELECT COUNT(id)
+            FROM sample
+            LEFT JOIN sample_has_source
+            ON (sample.id = sample_has_source.sample_id)
+            WHERE (sample_has_source.source_id IN %s)
+        ''', (get_sample_repository().allowed_source_ids,))
+        count = int(cursor.fetchall()[0][0])
+    return jsonify({'count': count})
+
+
 @app.route('/stats/build_time_stamps_by_year', methods=['GET'])
 def build_time_stamps_by_year():
     with get_db().cursor() as cursor:
