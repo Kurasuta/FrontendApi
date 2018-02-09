@@ -1,3 +1,5 @@
+import string
+
 from flask import Flask, jsonify, g
 from lib.flask import InvalidUsage
 from werkzeug.exceptions import NotFound
@@ -59,11 +61,22 @@ def handle_invalid_usage(error):
     return response
 
 
-@app.route('/sample/<sha256>', methods=['GET'])
-def get_sample(sha256):
-    validate_sha256(sha256)
-    sample = get_sample_repository().by_hash_sha256(sha256)
-    if not sample:
+@app.route('/sample/<hash>', methods=['GET'])
+def get_sample(hash):
+    if not hash:
+        raise InvalidUsage('Hash empty', status_code=400)
+    if not all(c in string.hexdigits for c in hash):
+        raise InvalidUsage('Hash may only contain hex chars', status_code=400)
+    if len(hash) == 64:
+        sample = get_sample_repository().by_hash_sha256(hash)
+    elif len(hash) == 32:
+        sample = get_sample_repository().by_hash_md5(hash)
+    elif len(hash) == 40:
+        sample = get_sample_repository().by_hash_sha1(hash)
+    else:
+        raise InvalidUsage('Hash is not of any of the following lengths: 64, 32, 40', status_code=400)
+
+    if sample is None:
         raise NotFound()
     return jsonify(JsonFactory().from_sample(sample))
 
