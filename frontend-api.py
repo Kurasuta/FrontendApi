@@ -103,6 +103,26 @@ def build_time_stamps_by_year():
     return jsonify(ret)
 
 
+@app.route('/stats/processings_per_month', methods=['GET'])
+def processings_per_month():
+    with get_db().cursor() as cursor:
+        cursor.execute('''
+            SELECT EXTRACT(YEAR FROM t.completed_at), EXTRACT(MONTH FROM t.completed_at), COUNT(t.id) 
+            FROM task t
+            WHERE (t.type = 'PEMetadata'::task_type) AND (t.completed_at IS NOT NULL)
+            GROUP BY 1, 2
+        ''')
+        ret = {}
+        for row in cursor.fetchall():
+            year = int(row[0])
+            month = int(row[1])
+            count = int(row[2])
+            if year not in ret:
+                ret[year] = {}
+            ret[year][month] = count
+    return jsonify(ret)
+
+
 @app.route('/random_sample/by_year/<year>', methods=['GET'])
 def random_sample_by_year(year):
     try:
