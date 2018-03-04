@@ -160,7 +160,7 @@ def random_sample_by_year(year):
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
               AND (sample_has_source.source_id IN %s)
-        ''' % (year, year + 1, get_sample_repository().allowed_source_ids))
+        ''', (year, year + 1, get_sample_repository().allowed_source_ids))
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
@@ -172,7 +172,7 @@ def random_sample_by_year(year):
               AND (build_timestamp < \'%i-01-01 00:00:00\')
               AND (sample_has_source.source_id IN %s)
             LIMIT 1 OFFSET %s
-            ''' % (year, year + 1, get_sample_repository().allowed_source_ids, rand)
+            ''', (year, year + 1, get_sample_repository().allowed_source_ids, rand)
         )
         random_sha256 = cursor.fetchall()[0][0]
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
