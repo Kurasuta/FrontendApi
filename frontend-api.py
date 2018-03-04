@@ -1,11 +1,11 @@
 import string
 
-from flask import Flask, jsonify, g
+from flask import Flask, jsonify, g, request
 from lib.flask import InvalidUsage
 from werkzeug.exceptions import NotFound
-from lib.repository import SampleRepository
+from lib.repository import SampleRepository, ApiKeyRepository
 from lib.sample import JsonFactory
-from lib.flask import validate_sha256
+from lib.flask import validate_sha256, validate_api_key
 import os
 import random
 import logging
@@ -45,6 +45,12 @@ def get_db():
 def get_sample_repository():
     if not hasattr(g, 'sample_repository'):
         g.sample_repository = SampleRepository(get_db(), app.config['PUBLIC_SOURCES'])
+    return g.sample_repository
+
+
+def get_api_key_repository():
+    if not hasattr(g, 'api_key_repository'):
+        g.api_key_repository = ApiKeyRepository(get_db())
     return g.sample_repository
 
 
@@ -181,7 +187,13 @@ def random_samples(count):
     if count <= 0:
         raise InvalidUsage('Given count should be above 0')
     if count > 50:
-        raise InvalidUsage('Given count should be below 50')
+        api_key = request.headers.get('X-ApiKey')
+        if not api_key:
+            raise InvalidUsage('Given count should be below 50 or you have to pass an API key')
+        validate_api_key(api_key)
+        if not get_api_key_repository().exists(api_key):
+            raise InvalidUsage('API key does not exist')
+
     return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().random(count))])
 
 
