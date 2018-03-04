@@ -51,7 +51,7 @@ def get_sample_repository():
 def get_api_key_repository():
     if not hasattr(g, 'api_key_repository'):
         g.api_key_repository = ApiKeyRepository(get_db())
-    return g.sample_repository
+    return g.api_key_repository
 
 
 @app.teardown_appcontext
