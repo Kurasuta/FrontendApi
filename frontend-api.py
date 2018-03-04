@@ -194,7 +194,7 @@ def random_samples(count):
         if not get_api_key_repository().exists(api_key):
             raise InvalidUsage('API key does not exist')
 
-    return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().random_by_offset(count))])
+    return jsonify([JsonFactory().from_sample(sample) for sample in (get_sample_repository().random_by_id(count))])
 
 
 @app.route('/section/<sha256>', methods=['GET'])
