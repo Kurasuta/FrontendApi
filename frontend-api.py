@@ -81,7 +81,6 @@ def get_sample(hash):
         sample = get_sample_repository().by_hash_sha1(hash)
     else:
         raise InvalidUsage('Hash is not of any of the following lengths: 64, 32, 40', status_code=400)
-
     if sample is None:
         raise NotFound()
     return jsonify(JsonFactory().from_sample(sample))
@@ -142,6 +141,19 @@ def processings_per_month():
     return jsonify(ret)
 
 
+@app.route('/stats/count/sample', methods=['GET'])
+def stats_count_sample():
+    with get_db().cursor() as cursor:
+        cursor.execute('''
+            SELECT COUNT(*)
+            FROM sample
+            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
+            WHERE (sample_has_source.source_id IN %s)
+        ''', (get_sample_repository().allowed_source_ids,))
+        count = cursor.fetchall()[0][0]
+    return jsonify({'sample': count})
+
+
 @app.route('/random_sample/by_year/<year>', methods=['GET'])
 def random_sample_by_year(year):
     try:
@@ -159,8 +171,8 @@ def random_sample_by_year(year):
             LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
-              AND (sample_has_source.source_id IN %s)
-        ''', (year, year + 1, get_sample_repository().allowed_source_ids))
+              AND (sample_has_source.source_id IN %%s)
+        ''' % (year, year + 1), (get_sample_repository().allowed_source_ids,))
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
@@ -170,9 +182,9 @@ def random_sample_by_year(year):
             LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
             WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
               AND (build_timestamp < \'%i-01-01 00:00:00\')
-              AND (sample_has_source.source_id IN %s)
-            LIMIT 1 OFFSET %s
-            ''', (year, year + 1, get_sample_repository().allowed_source_ids, rand)
+              AND (sample_has_source.source_id IN %%s)
+            LIMIT 1 OFFSET %%s
+            ''' % (year, year + 1), (get_sample_repository().allowed_source_ids, rand)
         )
         random_sha256 = cursor.fetchall()[0][0]
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
@@ -201,6 +213,59 @@ def random_samples(count):
 def get_samples_by_section(sha256):
     validate_sha256(sha256)
     samples = get_sample_repository().by_section_hash(sha256)
+    return jsonify([JsonFactory().from_sample(sample) for sample in samples])
+
+
+def get_sample_ids(hashes):
+    sha256 = []
+    md5 = []
+    sha1 = []
+    for line in hashes:
+        hash = line.strip().decode('utf-8')
+        if len(hash) == 64:
+            sha256.append(hash)
+        elif len(hash) == 32:
+            md5.append(hash)
+        elif len(hash) == 40:
+            sha1.append(hash)
+    where = []
+    args = []
+    if sha256:
+        where.append('(hash_sha256 IN %s)')
+        args.append(tuple(sha256))
+    if md5:
+        where.append('(hash_md5 IN %s)')
+        args.append(tuple(md5))
+    if sha1:
+        where.append('(hash_sha1 IN %s)')
+        args.append(tuple(sha1))
+
+    with get_db().cursor() as cursor:
+        args.append(get_sample_repository().allowed_source_ids)
+        cursor.execute(
+            '''
+                SELECT sample.id 
+                FROM sample
+                LEFT JOIN sample_has_source ON (sample_has_source.sample_id = sample.id) 
+                WHERE (%s) AND (sample_has_source.source_id IN %%s)
+            ''' % (' OR '.join(where)), args
+        )
+        ids = [row[0] for row in cursor.fetchall()]
+    return ids
+
+
+@app.route('/bulk/sample', methods=['POST'])
+def bulk():
+    api_key = request.headers.get('X-ApiKey')
+    if not api_key:
+        raise InvalidUsage('API key required for this action')
+    validate_api_key(api_key)
+
+    if 'hashes' not in request.files:
+        raise InvalidUsage('Field "hashes" does not exist')
+
+    samples = get_sample_repository().by_ids(get_sample_ids(request.files['hashes']))
+
     return jsonify([JsonFactory().from_sample(sample) for sample in samples])
 
 
