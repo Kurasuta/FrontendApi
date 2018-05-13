@@ -194,35 +194,6 @@ def get_samples_by_section(sha256):
     return jsonify([JsonFactory().from_sample(sample) for sample in samples])
 
 
-def get_sample_ids(hashes):
-    sha256 = []
-    md5 = []
-    sha1 = []
-    for line in hashes:
-        hash = line.strip().decode('utf-8')
-        if len(hash) == 64:
-            sha256.append(hash)
-        elif len(hash) == 32:
-            md5.append(hash)
-        elif len(hash) == 40:
-            sha1.append(hash)
-    where = []
-    args = []
-    if sha256:
-        where.append('(hash_sha256 IN %s)')
-        args.append(tuple(sha256))
-    if md5:
-        where.append('(hash_md5 IN %s)')
-        args.append(tuple(md5))
-    if sha1:
-        where.append('(hash_sha1 IN %s)')
-        args.append(tuple(sha1))
-
-    with get_db().cursor() as cursor:
-        cursor.execute('SELECT sample.id FROM sample WHERE (%s)' % (' OR '.join(where)), args)
-        ids = [row[0] for row in cursor.fetchall()]
-    return ids
-
 
 @app.route('/bulk/sample', methods=['POST'])
 def bulk():
@@ -234,7 +205,7 @@ def bulk():
     if 'hashes' not in request.files:
         raise InvalidUsage('Field "hashes" does not exist')
 
-    samples = get_sample_repository().by_ids(get_sample_ids(request.files['hashes']))
+    samples = get_sample_repository().by_ids(get_sample_repository().ids_by_hashes(request.files['hashes']))
 
     return jsonify([JsonFactory().from_sample(sample) for sample in samples])
 
