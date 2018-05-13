@@ -11,9 +11,6 @@ import random
 import logging
 import psycopg2
 
-if 'PUBLIC_SOURCES' not in os.environ:
-    raise Exception('Environment variable PUBLIC_SOURCES does not exist. Cannot start API.')
-
 logging.basicConfig(format='%(asctime)s %(message)s')
 logger = logging.getLogger('KurasutaFrontendApi')
 debugging_enabled = 'FLASK_DEBUG' in os.environ and os.environ['FLASK_DEBUG']
@@ -26,7 +23,6 @@ app.config.from_object(__name__)  # load config from this file , flaskr.py
 app.config.update(dict(
     DATABASE=os.environ['POSTGRES_DATABASE_LINK'],
     SECRET_KEY=os.environ['FLASK_SECRET_KEY'],
-    PUBLIC_SOURCES=[identifier.strip() for identifier in os.environ['PUBLIC_SOURCES'].split(',') if identifier.strip()]
 ))
 app.config.from_envvar('FLASKR_SETTINGS', silent=True)
 
@@ -44,7 +40,7 @@ def get_db():
 
 def get_sample_repository():
     if not hasattr(g, 'sample_repository'):
-        g.sample_repository = SampleRepository(get_db(), app.config['PUBLIC_SOURCES'])
+        g.sample_repository = SampleRepository(get_db())
     return g.sample_repository
 
 
@@ -94,13 +90,7 @@ def newest_samples():
 @app.route('/stats/count', methods=['GET'])
 def stats_count():
     with get_db().cursor() as cursor:
-        cursor.execute('''
-            SELECT COUNT(id)
-            FROM sample
-            LEFT JOIN sample_has_source
-            ON (sample.id = sample_has_source.sample_id)
-            WHERE (sample_has_source.source_id IN %s)
-        ''', (get_sample_repository().allowed_source_ids,))
+        cursor.execute('SELECT COUNT(id) FROM sample')
         count = int(cursor.fetchall()[0][0])
     return jsonify({'count': count})
 
@@ -109,12 +99,12 @@ def stats_count():
 def build_time_stamps_by_year():
     with get_db().cursor() as cursor:
         cursor.execute('''
-            SELECT EXTRACT(YEAR FROM build_timestamp), COUNT(*)
+            SELECT
+                EXTRACT(YEAR FROM build_timestamp),
+                COUNT(*)
             FROM sample
-            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
-            WHERE (sample_has_source.source_id IN %s)
             GROUP BY 1
-        ''', (get_sample_repository().allowed_source_ids,))
+        ''')
         ret = {}
         for row in cursor.fetchall():
             ret[int(row[0])] = int(row[1])
@@ -144,12 +134,7 @@ def processings_per_month():
 @app.route('/stats/count/sample', methods=['GET'])
 def stats_count_sample():
     with get_db().cursor() as cursor:
-        cursor.execute('''
-            SELECT COUNT(*)
-            FROM sample
-            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
-            WHERE (sample_has_source.source_id IN %s)
-        ''', (get_sample_repository().allowed_source_ids,))
+        cursor.execute('SELECT COUNT(*) FROM sample')
         count = cursor.fetchall()[0][0]
     return jsonify({'sample': count})
 
@@ -166,25 +151,18 @@ def random_sample_by_year(year):
         raise InvalidUsage('Given year should be below 3000')
     with get_db().cursor() as cursor:
         cursor.execute('''
-            SELECT COUNT(*)
-            FROM sample
-            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
-            WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
-              AND (build_timestamp < \'%i-01-01 00:00:00\')
-              AND (sample_has_source.source_id IN %%s)
-        ''' % (year, year + 1), (get_sample_repository().allowed_source_ids,))
+            SELECT COUNT(*) FROM sample
+            WHERE 
+                (\'%i-01-01 00:00:00\' <= build_timestamp) AND (build_timestamp < \'%i-01-01 00:00:00\')
+        ''' % (year, year + 1))
         count = cursor.fetchall()[0][0]
         rand = random.randint(0, count - 1)
         cursor.execute(
             '''
-            SELECT hash_sha256
-            FROM sample
-            LEFT JOIN sample_has_source ON (sample.id = sample_has_source.sample_id)
-            WHERE (\'%i-01-01 00:00:00\' <= build_timestamp)
-              AND (build_timestamp < \'%i-01-01 00:00:00\')
-              AND (sample_has_source.source_id IN %%s)
+            SELECT hash_sha256 FROM sample
+            WHERE (\'%i-01-01 00:00:00\' <= build_timestamp) AND (build_timestamp < \'%i-01-01 00:00:00\')
             LIMIT 1 OFFSET %%s
-            ''' % (year, year + 1), (get_sample_repository().allowed_source_ids, rand)
+            ''' % (year, year + 1), (rand, )
         )
         random_sha256 = cursor.fetchall()[0][0]
         return jsonify(JsonFactory().from_sample(get_sample_repository().by_hash_sha256(random_sha256)))
@@ -241,15 +219,7 @@ def get_sample_ids(hashes):
         args.append(tuple(sha1))
 
     with get_db().cursor() as cursor:
-        args.append(get_sample_repository().allowed_source_ids)
-        cursor.execute(
-            '''
-                SELECT sample.id 
-                FROM sample
-                LEFT JOIN sample_has_source ON (sample_has_source.sample_id = sample.id) 
-                WHERE (%s) AND (sample_has_source.source_id IN %%s)
-            ''' % (' OR '.join(where)), args
-        )
+        cursor.execute('SELECT sample.id FROM sample WHERE (%s)' % (' OR '.join(where)), args)
         ids = [row[0] for row in cursor.fetchall()]
     return ids
 
